@@ -1,0 +1,157 @@
+# **Root Cause Analysis (RCA) for SRE Assignment - Metrics App Deployment**
+
+## **Issue Summary**
+
+During the deployment of the **Metrics App** via Helm, ArgoCD, and KIND, several issues were identified while testing the `/counter` endpoint. These issues were investigated to determine their root causes and provide potential solutions for remediation. The primary issues observed were:
+
+1. **Ingress Not Working** - The `/counter` endpoint was not accessible externally.
+2. **Counter Not Incrementing** - The counter value did not increment as expected.
+3. **Slow and Inconsistent Responses** - Response times for the `/counter` endpoint varied significantly.
+
+This document details the findings, root causes, and suggested fixes for each issue.
+
+---
+
+## **1. Ingress Not Working**
+
+### **Symptom:**
+- The `/counter` endpoint was not accessible externally, leading to a `404 Not Found` error or no response at all when attempting to access it via `curl` or a browser.
+
+### **Root Cause:**
+- **Ingress Controller Misconfiguration**: The NGINX Ingress Controller, responsible for routing external traffic to the application, was not properly configured or was missing from the Kubernetes cluster.
+- **Incorrect Ingress Resource Definition**: The Ingress resource did not correctly map the `/counter` path to the backend service exposing the app.
+
+### **Resolution:**
+1. **Verify Ingress Controller Installation**:
+    - Ensure that the **NGINX Ingress Controller** is correctly installed and running. You can verify this with:
+    ```bash
+    kubectl get pods -n ingress-nginx
+    ```
+    - If missing, reinstall the controller:
+    ```bash
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+    ```
+
+2. **Update Ingress Resource**:
+    - Ensure the correct configuration of the Ingress resource, ensuring that the `/counter` path points to the correct service and port. Example:
+    ```yaml
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: metrics-app-ingress
+    spec:
+      rules:
+      - host: localhost
+        http:
+          paths:
+          - path: /counter
+            pathType: Prefix
+            backend:
+              service:
+                name: metrics-app
+                port:
+                  number: 8080
+    ```
+    - Apply the updated Ingress configuration:
+    ```bash
+    kubectl apply -f metrics-app-ingress.yaml
+    ```
+
+---
+
+## **2. Counter Not Incrementing**
+
+### **Symptom:**
+- The `/counter` endpoint returned the same counter value (`1`) on every request, indicating the counter was not incrementing as expected.
+
+### **Root Cause:**
+- **Stateless Application Design**: The application was designed to be stateless, meaning each request to the `/counter` endpoint did not persist the counter state between different pod instances. Consequently, the counter value was always reset to `1` with each request.
+  
+### **Resolution:**
+1. **Implement State Persistence**:
+    - Modify the app to store the counter value in a persistent store such as a **Redis** instance or a database, so that it retains state across requests. Alternatively, the counter can be maintained within the pod's memory, but this would require sticky sessions to ensure each request is routed to the same pod.
+
+2. **Implement Sticky Sessions (if desired)**:
+    - Configure **session affinity** in the Ingress resource to route all requests from a single client to the same pod, ensuring consistent counter state:
+    ```yaml
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: metrics-app-ingress
+    spec:
+      rules:
+      - host: localhost
+        http:
+          paths:
+          - path: /counter
+            pathType: Prefix
+            backend:
+              service:
+                name: metrics-app
+                port:
+                  number: 8080
+    ```
+
+3. **Ensure Counter Logic is Correct**:
+    - Review the application’s code to ensure the counter increments on each request and persists the value across multiple requests. If state management is missing, implement logic to increment the counter correctly.
+
+---
+
+## **3. Slow and Inconsistent Responses**
+
+### **Symptom:**
+- Some requests to the `/counter` endpoint returned quickly, while others experienced significant delays or timeouts.
+
+### **Root Cause:**
+- **Resource Bottlenecks**: The application was under-resourced, causing delays when scaling was insufficient to handle the traffic load. The pod may not have been allocated enough CPU or memory resources, leading to throttling or out-of-memory issues.
+- **Scaling Issues**: With only a single pod running, the app was unable to handle multiple concurrent requests efficiently, especially if the pod was running in a resource-constrained environment.
+
+### **Resolution:**
+1. **Increase Resource Requests and Limits**:
+    - Allocate more CPU and memory resources to the pods to ensure that they can handle more traffic. Modify the `deployment.yaml` to set appropriate resource requests and limits:
+    ```yaml
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+    ```
+
+2. **Scale the Deployment**:
+    - Increase the number of replicas for the application to distribute the load across multiple pods. Update the `deployment.yaml` to specify more replicas:
+    ```yaml
+    replicas: 3
+    ```
+
+3. **Monitor Resource Usage**:
+    - Use **Prometheus** and **Grafana** to monitor pod resource usage (CPU, memory) and ensure there are no bottlenecks. Check resource usage with:
+    ```bash
+    kubectl top pod
+    ```
+
+4. **Check Cluster Performance**:
+    - Ensure that the Kubernetes cluster itself is not resource-starved. Investigate cluster-level resource allocation and optimize if necessary.
+
+---
+
+## **Conclusion & Next Steps**
+
+The **Metrics App** deployment experienced the following issues:
+
+1. **Ingress issues** were due to misconfiguration of the Ingress controller or resource.
+2. **Counter not incrementing** was due to the stateless nature of the application, requiring the implementation of state persistence.
+3. **Slow responses** were caused by insufficient resource allocation, which can be resolved by scaling the deployment and optimizing resource requests.
+
+**Next Steps**:
+- Implement the recommended fixes for each of the issues identified.
+- Test the application after implementing the fixes to ensure all issues are resolved.
+- Monitor the application’s performance in production and ensure scalability and reliability.
+
+This root cause analysis provides a roadmap to resolving the issues encountered, with clear steps for remediation and testing. The final solution will ensure that the Metrics App is both stable and scalable in a production-like environment.
+
+--- 
+
+**Prepared by:**  
+joshua v
