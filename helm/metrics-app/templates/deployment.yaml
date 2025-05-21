@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "metrics-app.fullname" . }}
+  labels:
+    {{- include "metrics-app.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- else }}
+  # If autoscaling is enabled, replicas field is managed by HPA
+  # You might want to set a default replica count if HPA is not immediately active
+  replicas: {{ .Values.autoscaling.minReplicas | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "metrics-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "metrics-app.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "metrics-app.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: {{ .Values.appConfig.envVarName }} # This will be "PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  # Name of the Secret object. Defaults if appConfig.secretName is not set.
+                  name: {{ .Values.appConfig.secretName | default (printf "%s-secret" (include "metrics-app.fullname" .)) }}
+                  # Key within the Secret (e.g., "PASSWORD") whose value will be used.
+                  key: {{ .Values.appConfig.secretKey }}
+          ports:
+            - name: http # Named port for service and probes
+              containerPort: {{ .Values.service.targetPort }} # App listens on this port (8080)
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /counter # Endpoint for liveness check
+              port: http     # Refers to the named port 'http'
+            initialDelaySeconds: 15 # Wait before first probe
+            periodSeconds: 10       # Probe frequency
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /counter # Endpoint for readiness check
+              port: http     # Refers to the named port 'http'
+            initialDelaySeconds: 5  # Wait before first probe
+            periodSeconds: 5        # Probe frequency
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 2
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

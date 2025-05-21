@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-app
+  namespace: argocd # ArgoCD's own namespace
+  finalizers: # Best practice: ensure resources are cleaned up when the Application CR is deleted
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default # Default ArgoCD project
+
+  source:
+    repoURL: 'https://github.com/joshua1787/metrics-app-helm-argocd.git' # <-- YOUR GIT REPO URL
+    targetRevision: HEAD # Or your specific branch like 'main' or a specific tag
+    path: helm/metrics-app # Path to the Helm chart within the repo
+    helm:
+      valueFiles:
+        - values.yaml # Use values from the chart's values.yaml
+
+  destination:
+    server: 'https://kubernetes.default.svc' # Target cluster URL (this is the internal URL for the same cluster where ArgoCD is running)
+    namespace: metrics-app-ns # Namespace where the app will be deployed
+
+  syncPolicy:
+    automated: # Enable automated synchronization
+      prune: true    # Removes resources that are no longer defined in Git
+      selfHeal: true # Reverts any manual changes made in the cluster to match Git state
+    syncOptions:
+      - CreateNamespace=true # Automatically create the 'metrics-app-ns' namespace if it doesn't exist
+      # - ApplyOutOfSyncOnly=true # Useful for preventing sync loops with some controllers
+      # - ServerSideApply=true # Recommended for newer Kubernetes versions for better conflict resolution.

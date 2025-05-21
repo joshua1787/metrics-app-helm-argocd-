@@ -1,0 +1,18 @@
+# This would be the content of your kind-config.yaml file
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true" # Label the node for the NGINX Ingress Controller
+  extraPortMappings: # Map ports from the host to the Kind node (control-plane)
+  - containerPort: 80  # NGINX Ingress HTTP port on the Kind node
+    hostPort: 80       # Expose on host port 80
+    protocol: TCP
+  - containerPort: 443 # NGINX Ingress HTTPS port on the Kind node
+    hostPort: 443      # Expose on host port 443
+    protocol: TCP

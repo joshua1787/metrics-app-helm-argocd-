@@ -1,0 +1,16 @@
+apiVersion: v2
+name: metrics-app
+description: A Helm chart for the metrics-app
+type: application
+version: 0.1.0 # Chart version
+appVersion: "1.4" # Application version it deploys (ghcr.io/cloudraftio/metrics-app:1.4)
+
+maintainers:
+  - name: Joshua # You can change this to your name/handle
+    email: joshuaveeraiah@gmail.com # You can change this
+
+keywords:
+  - metrics
+  - counter
+  - example
+  - cloudraft

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "metrics-app.fullname" . }}
+  labels:
+    {{- include "metrics-app.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }} # Service listens on this port (e.g., 8080)
+      targetPort: http # Forwards to the container's 'http' named port (which is 8080)
+      protocol: TCP
+      name: http # Name of this service port, can be referenced by Ingress
+  selector:
+    {{- include "metrics-app.selectorLabels" . | nindent 4 }}
