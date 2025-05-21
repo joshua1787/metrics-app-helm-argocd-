@@ -9,8 +9,8 @@ spec:
   project: default # Default ArgoCD project
 
   source:
-    repoURL: 'https://github.com/joshua1787/metrics-app-helm-argocd.git' # <-- YOUR GIT REPO URL
-    targetRevision: HEAD # Or your specific branch like 'main' or a specific tag
+    repoURL: 'https://github.com/joshua1787/metrics-app-helm-argocd-.git' # <-- YOUR GIT REPO URL
+    targetRevision: main # Or your specific branch like 'main' or a specific tag
     path: helm/metrics-app # Path to the Helm chart within the repo
     helm:
       valueFiles:
